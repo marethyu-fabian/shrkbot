@@ -14,14 +14,16 @@ class Shrkbot::Logger
     event: :guild_create
   )]
   def init_log_channel(payload)
-    # Make sure that the table exists on startup. Should only be relevant the very first time the bot
-    # starts up. I tried to use ready for this, but apparently that was too slow and I got an exception.
-    if @first
-      init_table
-      @first = false
-    end
+    spawn do
+      # Make sure that the table exists on startup. Should only be relevant the very first time the bot
+      # starts up. I tried to use ready for this, but apparently that was too slow and I got an exception.
+      if @first
+        init_table
+        @first = false
+      end
 
-    Shrkbot::Logger.setup(payload.id, client) if PluginSelector.enabled?(payload.id, "logger")
+      Shrkbot::Logger.setup(payload.id, client) if PluginSelector.enabled?(payload.id, "logger")
+    end
   end
 
   @[Discord::Handler(
@@ -29,8 +31,8 @@ class Shrkbot::Logger
     middleware: {
       Command.new(["setLogChannel", "lc="]),
       GuildChecker.new,
-      PermissionChecker.new(PermissionLevel::Moderator),
       EnabledChecker.new("logging"),
+      PermissionChecker.new(PermissionLevel::Moderator),
     }
   )]
   def set_log_channel(payload, ctx)
@@ -70,8 +72,8 @@ class Shrkbot::Logger
     event: :message_create,
     middleware: {
       Command.new("logChannel"),
-      GuildChecker.new,
       EnabledChecker.new("logging"),
+      GuildChecker.new,
     }
   )]
   def log_channel(payload, ctx)
@@ -107,7 +109,7 @@ class Shrkbot::Logger
 
   def self.log(guild_id : Discord::Snowflake, message : String, mod : Discord::User? = nil)
     if PluginSelector.enabled?(guild_id, "logging")
-      message += " This action was performed by `#{mod.username}##{mod.discriminator}`." if mod
+      message += "\nThis action was performed by **#{mod.username}##{mod.discriminator}**." if mod
       Shrkbot.bot(guild_id.to_u64).client.create_message(@@log_channel[guild_id], message)
     end
   end

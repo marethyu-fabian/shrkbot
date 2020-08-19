@@ -21,15 +21,17 @@ class Shrkbot::RoleAssignment
   @[Discord::Handler(
     event: :guild_create
   )]
-  def init_role_channel(payload)
-    # Make sure that the table exists on startup. Should only be relevant the very first time the bot
-    # starts up. I tried to use ready for this, but apparently that was too slow and I got an exception.
-    if @first
-      init_table
-      @first = false
-    end
+  def init_roles(payload)
+    spawn do
+      # Make sure that the table exists on startup. Should only be relevant the very first time the bot
+      # starts up. I tried to use ready for this, but apparently that was too slow and I got an exception.
+      if @first
+        init_table
+        @first = false
+      end
 
-    Shrkbot::RoleAssignment.setup(payload.id, client) if PluginSelector.enabled?(payload.id, "roles")
+      Shrkbot::RoleAssignment.setup(payload.id, client) if PluginSelector.enabled?(payload.id, "roles")
+    end
   end
 
   def self.setup(guild : Discord::Snowflake, client : Discord::Client)
@@ -94,8 +96,8 @@ class Shrkbot::RoleAssignment
     middleware: {
       Command.new(["roleLogsOff", "rl-"]),
       GuildChecker.new,
-      PermissionChecker.new(PermissionLevel::Moderator),
       EnabledChecker.new("roles"),
+      PermissionChecker.new(PermissionLevel::Moderator),
     }
   )]
   def disable_logs(payload, ctx)
@@ -111,8 +113,8 @@ class Shrkbot::RoleAssignment
     middleware: {
       Command.new(["roleLogsOn", "rl+"]),
       GuildChecker.new,
-      PermissionChecker.new(PermissionLevel::Moderator),
       EnabledChecker.new("roles"),
+      PermissionChecker.new(PermissionLevel::Moderator),
     }
   )]
   def enable_logs(payload, ctx)
@@ -128,8 +130,8 @@ class Shrkbot::RoleAssignment
     middleware: {
       Command.new(["roleNotifsOff", "rn-"]),
       GuildChecker.new,
-      PermissionChecker.new(PermissionLevel::Moderator),
       EnabledChecker.new("roles"),
+      PermissionChecker.new(PermissionLevel::Moderator),
     }
   )]
   def disable_notifs(payload, ctx)
@@ -145,8 +147,8 @@ class Shrkbot::RoleAssignment
     middleware: {
       Command.new(["roleNotifsOn", "rn+"]),
       GuildChecker.new,
-      PermissionChecker.new(PermissionLevel::Moderator),
       EnabledChecker.new("roles"),
+      PermissionChecker.new(PermissionLevel::Moderator),
     }
   )]
   def enable_notifs(payload, ctx)
@@ -162,8 +164,8 @@ class Shrkbot::RoleAssignment
     middleware: {
       Command.new(["setRoleChannel", "rc="]),
       GuildChecker.new,
-      PermissionChecker.new(PermissionLevel::Moderator),
       EnabledChecker.new("roles"),
+      PermissionChecker.new(PermissionLevel::Moderator),
     }
   )]
   def set_role_channel(payload, ctx)
@@ -188,7 +190,7 @@ class Shrkbot::RoleAssignment
 
       @@role_channel[guild] = id
       Shrkbot.bot.db.update_value("shrk_roles", "channel", id, "guild", guild)
-      Logger.log(guild, "Set #{channel[0]} has been set as the role assignment channel.", payload.author)
+      Logger.log(guild, "Set #{channel[0]} as the role assignment channel.", payload.author)
       client.create_reaction(payload.channel_id, payload.id, CHECKMARK)
 
       @@role_message[guild] = RoleAssignment.create_role_message_and_reactions(guild, client)
@@ -206,9 +208,9 @@ class Shrkbot::RoleAssignment
     middleware: {
       Command.new(["addReactionRole", "rr+"]),
       GuildChecker.new,
+      EnabledChecker.new("roles"),
       PermissionChecker.new(PermissionLevel::Moderator),
       ArgumentChecker.new(1),
-      EnabledChecker.new("roles"),
     }
   )]
   def add_reaction_role(payload, ctx)
@@ -247,9 +249,9 @@ class Shrkbot::RoleAssignment
     middleware: {
       Command.new(["removeReactionRole", "rr-"]),
       GuildChecker.new,
+      EnabledChecker.new("roles"),
       PermissionChecker.new(PermissionLevel::Moderator),
       ArgumentChecker.new(1),
-      EnabledChecker.new("roles"),
     }
   )]
   def rem_reaction_role(payload, ctx)
@@ -300,7 +302,7 @@ class Shrkbot::RoleAssignment
     client.add_guild_member_role(guild_id, payload.user_id, role.id)
 
     if @@role_notifs[guild_id]
-      client.create_message(client.create_dm(payload.user_id).id, "I gave you the role `#{role.name}` on \"#{client.get_guild(guild_id).name}\".")
+      client.create_message(client.create_dm(payload.user_id).id, "I gave you the role `#{role.name}` on \"#{Shrkbot.bot.cache.resolve_guild(guild_id).name}\".")
     end
     if @@role_logs[guild_id]
       member = client.get_guild_member(guild_id, payload.user_id)
@@ -326,7 +328,7 @@ class Shrkbot::RoleAssignment
     client.remove_guild_member_role(guild_id.to_u64, payload.user_id.to_u64, role.id.to_u64)
 
     if @@role_notifs[guild_id]
-      client.create_message(client.create_dm(payload.user_id).id, "I removed the role `#{role.name}` on \"#{client.get_guild(guild_id).name}\".")
+      client.create_message(client.create_dm(payload.user_id).id, "I removed the role `#{role.name}` on \"#{Shrkbot.bot.cache.resolve_guild(guild_id).name}\".")
     end
     if @@role_logs[guild_id]
       member = client.get_guild_member(guild_id, payload.user_id)
